@@ -13,18 +13,20 @@ import pandas as pd
 slim = tf.contrib.slim
 
 
-class makeLogClass:
-    def __init__(self, logDir):
-        self.logDir = logDir
-    # Print the message
+class MakeLogClass:
+    def __init__(self, log_file):
+        self.log_file = log_file
+        if os.path.exists(self.log_file):
+            os.remove(self.log_file)
+    # makeLog the message
+
     def make(self, *args):
         print(*args, file=sys.stderr)
         # Write the message to the file
-        with open(self.logDir, "a") as f:
+        with open(self.log_file, "a") as f:
             for arg in args:
                 f.write("{}".format(arg))
                 f.write("\n")
-
 
 
 def imagePreprocess(inputDecodedImage):
@@ -324,8 +326,7 @@ def run_main(FLAGS):
                                                testing_dict["label_tensor"],
                                                is_training=False,
                                                FLAGS=FLAGS)
-        batches_per_epoch = training_dict["data_length"] // FLAGS["batch_size"]
-        batches_per_epoch = batches_per_epoch if training_dict["data_length"] % FLAGS["batch_size"] else batches_per_epoch + 1
+        batches_per_epoch = np.ceil(training_dict["data_length"] / FLAGS["batch_size"]).astype(np.int32)
         lastTime = time.time()
         with tf.train.MonitoredTrainingSession(checkpoint_dir=FLAGS["checkpoint_dir"]) as sess:
             if FLAGS["fineTuneModel"] != "":
@@ -349,7 +350,7 @@ def run_main(FLAGS):
                 if this_epoch != next_step_epoch:
                     print("next_epoch")
                 if not next_step_epoch % FLAGS["eval_interval"] and not (g_step + 1) % batches_per_epoch:
-                    output_graph_def = tf.graph_util.convert_variables_to_constants(sess, tf.Graph(), [FLAGS["output_tensor_name"]])
+                    output_graph_def = tf.graph_util.convert_variables_to_constants(sess, tf.GraphDef(), [testing_tensor_dict["output_tensor_name"]])
                     with tf.gfile.GFile("{}/{}_{:.2f}_".format(FLAGS["save_pb_model_dir"], this_epoch, acc), "wb") as f:
                         f.write(output_graph_def.SerializeToString())
                     print("eval_interval")
@@ -436,7 +437,7 @@ if __name__ == '__main__':
     os.makedirs(results_dir, exist_ok=True)
     os.makedirs(summary_dir, exist_ok=True)
 
-    makeLog = makeLogClass(log_file).make
+    makeLog = MakeLogClass(log_file).make
 
 
     print_misclassified_test_images = False
